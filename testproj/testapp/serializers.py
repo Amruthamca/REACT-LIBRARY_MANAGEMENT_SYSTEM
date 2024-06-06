@@ -21,11 +21,13 @@ class BookSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RentalSerializer(serializers.ModelSerializer):
+    book = BookSerializer()
     class Meta:
         model = Rental
         fields = '__all__'
 
 class PurchaseSerializer(serializers.ModelSerializer):
+    book = BookSerializer()
     class Meta:
         model = Purchase
         fields = '__all__'
