@@ -156,7 +156,7 @@ def purchase_books(request):
         # Send confirmation email
         subject = 'Purchase Confirmation'
         message = f'Your purchase has been successful. Details: {purchases}'
-        from_email = 'amruthabiju27@gmail.com'  # Update with your email
+        from_email = 'amruthabiju1227@gmail.com'  # Update with your email
         to_email = [user.email]  # Assuming user has an email field
 
         send_mail(subject, message, from_email, to_email)
@@ -164,88 +164,12 @@ def purchase_books(request):
         return JsonResponse({'message': 'Purchase successful', 'purchases': purchases}, status=201)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
-# @api_view(['GET'])
-# def get_books(request):
-#     books = Book.objects.all()
-#     serializer = BookSerializer(books, many=True)
-#     return Response(serializer.data)
 
-
-# @api_view(['GET'])
-# def get_rentals(request):
-#     rentals = Rental.objects.filter(user=request.user)
-#     serializer = RentalSerializer(rentals, many=True)
-#     return Response(serializer.data)
-
-
-# @api_view(['POST'])
-# def rent_book(request):
-#     book_id = request.data.get('book')
-#     try:
-#         book = Book.objects.get(id=book_id)
-#         if book.stock > 0:
-#             rental = Rental.objects.create(user=request.user, book=book, due_date=request.data.get('due_date'))
-#             book.stock -= 1
-#             book.save()
-#             serializer = RentalSerializer(rental)
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         else:
-#             return Response({'message': 'Book out of stock'}, status=status.HTTP_400_BAD_REQUEST)
-#     except Book.DoesNotExist:
-#         return Response({'message': 'Book not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-# @api_view(['POST'])
-# def report_lost_book(request):
-#     rental_id = request.data.get('rental_id')
-#     try:
-#         rental = Rental.objects.get(id=rental_id)
-#         if not rental.returned and not rental.lost:
-#             rental.lost = True
-#             rental.fine_amount = rental.book.price + 10  # Example: book price + additional charge
-#             rental.save()
-#             return Response({'message': 'Book reported as lost'}, status=status.HTTP_200_OK)
-#         else:
-#             return Response({'message': 'Invalid operation'}, status=status.HTTP_400_BAD_REQUEST)
-#     except Rental.DoesNotExist:
-#         return Response({'message': 'Rental not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-# @api_view(['GET'])
-# def rental_history(request):
-#     rentals = Rental.objects.filter(user=request.user)
-#     serializer = RentalSerializer(rentals, many=True)
-#     return Response(serializer.data)
-
-
-# @api_view(['POST'])
-# def purchase_book(request):
-#     book_id = request.data.get('book')
-#     quantity = request.data.get('quantity')
-#     try:
-#         book = Book.objects.get(id=book_id)
-#         total_price = book.price * quantity
-#         purchase = Purchase.objects.create(user=request.user, book=book, quantity=quantity, total_price=total_price)
-#         serializer = PurchaseSerializer(purchase)
-#         # Send confirmation email logic here
-#         return Response(serializer.data, status=status.HTTP_201_CREATED)
-#     except Book.DoesNotExist:
-#         return Response({'message': 'Book not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = Customuser.objects.all()
     serializer_class = UserSerializer
 
-    # @action(detail=False, methods=['post'])
-    # def approve_user(self, request):
-    #     user_id = request.data.get('user_id')
-    #     try:
-    #         user = Customuser.objects.get(id=user_id)
-    #         user.is_approved = True
-    #         user.save()
-    #         return Response({'status': 'User approved'}, status=status.HTTP_200_OK)
-    #     except Customuser.DoesNotExist:
-    #         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class LoginView(APIView):
     def post(self, request):
