@@ -11,6 +11,7 @@ from django.contrib.auth import authenticate, login
 import string
 from django.views.decorators.http import require_GET, require_POST
 import json
+from django.shortcuts import redirect
 import random
 from rest_framework.decorators import api_view,permission_classes
 from django.http import JsonResponse
@@ -165,6 +166,28 @@ def purchase_books(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
+@api_view(['POST'])
+def reset_password(request):
+    username = request.data.get('username')
+    old_password = request.data.get('Current_password')
+    new_password = request.data.get('New_password')
+
+    user = authenticate(username=username, password=old_password)
+    if user is not None:
+        if len(new_password) < 6 or not any(char.isupper() for char in new_password) \
+                     or not any(char.isdigit() for char in new_password) \
+                     or not any(char in '!@#$%^&*()_+-=[]{}|;:,.<>?/~' for char in new_password):
+            return JsonResponse({'message': 'Password must be at least 6 characters long and contain at least one uppercase letter, one digit, and one special character, or entered password does not match'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            user.set_password(new_password)
+            user.save()
+            return Response({"message": "Password reset successful"}, status=status.HTTP_200_OK)
+    else:
+        return JsonResponse({"message": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
+    
+# def logout_view(request):
+#     request.session.clear()  
+#     return redirect('/') 
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = Customuser.objects.all()
