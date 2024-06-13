@@ -1,9 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import LoginView
+from .views import LoginView,UserViewSet,RentalViewSet
 from .import views
+from .views import RentBookView, ReportLostBookView, RentalHistoryView
 
 router = DefaultRouter()
+router.register(r'users',UserViewSet)
+# router.register(r'books',RentalViewSet)
+router.register(r'rentals', RentalViewSet)
 
 
 
@@ -20,20 +24,15 @@ urlpatterns = [
     path('users/<int:user_id>/approve/', views.approve_user, name='approve_user'),
     path('books/', views.get_books, name='get_books'),
      path('rentals/rent/',views. rent_book, name='rent_book'),
-    path('purchases/', views.purchase_books, name='purchase_books'),
+    # path('purchases/', views.purchase_books, name='purchase_books'),
+    path('purchases/', views.create_purchase, name='create_purchase'),
     path('reset-password/', views.reset_password, name='reset_password'),
-    # path('logout/', views.logout_view, name='logout'),
-    # path('rentals/', views.get_rentals, name='get_rentals'),
-    # path('rentals/rent/', views.rent_book, name='rent_book'),
-    # path('rentals/report_lost/', views.report_lost_book, name='report_lost_book'),
-    # path('rentals/history/', views.rental_history, name='rental_history'),
-    # path('purchases/', views.purchase_book, name='purchase_book'),
+    path('pending-users/', views.pending_users, name='pending_users'),
+    path('approve-user/', views.approve_user, name='approve_user'),
+    path('rent-book/<int:book_id>/', RentBookView.as_view(), name='rent-book'),
+    path('rentals/report-lost/<int:rental_id>/', ReportLostBookView.as_view(), name='report-lost'),
+    path('rentals/history/', RentalHistoryView.as_view(), name='rental-history'),
     
-    # path('pending-approvals/', views.pending_approvals, name='pending-approvals'),
-    # path('approve-user/', views.approve_user, name='approve-user'),
-    # path('add-book/', views.add_book, name='add_book'),
-    # path('manage-books/', views.manage_books, name='manage_books'),
-    # path('user-history/', views.user_history, name='user_history'),
     
     
 

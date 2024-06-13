@@ -27,10 +27,9 @@ class RentalSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PurchaseSerializer(serializers.ModelSerializer):
-    book = BookSerializer()
     class Meta:
         model = Purchase
-        fields = '__all__'
+        fields = ('user', 'book', 'quantity', 'total_price')
 
 
    
