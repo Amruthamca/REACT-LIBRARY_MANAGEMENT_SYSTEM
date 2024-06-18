@@ -21,7 +21,9 @@ class BookSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RentalSerializer(serializers.ModelSerializer):
-    book = BookSerializer()
+    book = serializers.StringRelatedField()
+    user = serializers.StringRelatedField()
+
     class Meta:
         model = Rental
         fields = '__all__'

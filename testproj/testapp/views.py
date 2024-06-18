@@ -23,7 +23,9 @@ from django.shortcuts import get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,date
+from django.utils.timezone import now
+from rest_framework.permissions import IsAuthenticated
 @api_view(['POST'])
 def add_book(request):
     name = request.data.get('name')
@@ -134,51 +136,9 @@ def get_books(request):
 #     except Exception as e:
 #         return JsonResponse({'error': str(e)}, status=400)
 
-CustomUser = get_user_model()
 
-@api_view(['POST'])
-def create_purchase(request):
-    if request.method == 'POST':
-        purchases_data = request.data
-        purchase_responses = []
 
-        for item in purchases_data:
-           
-                user = CustomUser.objects.get(username=item['username'])
-                book = Book.objects.get(id=item['book'])
-                total_price = item['quantity'] * book.price
 
-                purchase = Purchase(
-                    user=user,
-                    book=book,
-                    quantity=item['quantity'],
-                    total_price=total_price
-                )
-                purchase.save()
-                purchase_responses.append({
-                    'user': user.username,
-                    'book': book.name,
-                    'quantity': purchase.quantity,
-                    'total_price': str(purchase.total_price),
-                })
-
-                # Send confirmation email
-                send_mail(
-                    'Purchase Confirmation',
-                    f'Thank you for your purchase, {user.username}! You bought {purchase.quantity} copies of {book.name}.',
-                    'amruthabiju1227@gmail.com',
-                    [user.email],
-                    fail_silently=False,
-                )
-
-            # except CustomUser.DoesNotExist:
-            #     return Response({'error': f'User with username {item["username"]} does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
-            # except Book.DoesNotExist:
-            #     return Response({'error': f'Book with ID {item["book"]} does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(purchase_responses, status=status.HTTP_201_CREATED)
-
-    return Response({'error': 'Invalid request method.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 @api_view(['POST'])
 def reset_password(request):
     username = request.data.get('username')
@@ -259,7 +219,7 @@ class LoginView(APIView):
                 refresh = RefreshToken.for_user(user)
                 
                 print(refresh.access_token)
-                return JsonResponse({'access':str(refresh.access_token),'role':role},safe=False)
+                return JsonResponse({'access':str(refresh.access_token),'role':role, 'user':user.id },safe=False)
         else:
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -355,34 +315,207 @@ def approve_user(request):
         
         return JsonResponse({"message": "User status updated successfully"})
     
+# class RentBookView(APIView):
+#     def post(self, request, book_id, *args, **kwargs):
+#         try:
+#             book = Book.objects.get(id=book_id)
+#             rental_period = request.data.get('rentalPeriod', 1)
+#             if book.stock > 0:
+#                 book.stock -= 1 
+#                 book.save()
+#                 due_date = datetime.now() + timedelta(days=int(rental_period))
+                
+#                 return Response({"message": "Book rented successfully", "due_date": due_date.strftime('%Y-%m-%d')}, status=status.HTTP_200_OK)
+#             else:
+#                 return Response({"error": "Book out of stock"}, status=status.HTTP_400_BAD_REQUEST)
+#         except Book.DoesNotExist:
+#             return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+# class ReportLostBookView(APIView):
+#     def post(self, request, rental_id, *args, **kwargs):
+#         try:
+#             rental = Rental.objects.get(id=rental_id)
+#             rental.lost = True
+#             rental.calculate_fine()
+#             rental.save()
+#             return Response({"message": "Book reported as lost", "fine_amount": rental.fine_amount}, status=status.HTTP_200_OK)
+#         except Rental.DoesNotExist:
+#             return Response({"error": "Rental not found"}, status=status.HTTP_404_NOT_FOUND)
+
+# class RentalHistoryView(APIView):
+#     def get(self, request, *args, **kwargs):
+#         rentals = Rental.objects.filter(user=request.user)
+#         serializer = RentalSerializer(rentals, many=True)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class RentBookView(APIView):
     def post(self, request, book_id, *args, **kwargs):
-        try:
             book = Book.objects.get(id=book_id)
             rental_period = request.data.get('rentalPeriod', 1)
+            user = request.user
+            print(user)
+            user = Customuser.objects.get(id=user)  
+
+
             if book.stock > 0:
-                book.stock -= 1 
+                book.stock -= 1
                 book.save()
                 due_date = datetime.now() + timedelta(days=int(rental_period))
-                return Response({"message": "Book rented successfully", "due_date": due_date.strftime('%Y-%m-%d')}, status=status.HTTP_200_OK)
+                rental = Rental.objects.create(
+                    user=user,
+                    book=book,
+                    due_date=due_date,
+                    # book_name=book_name
+                )
+                serializer = RentalSerializer(rental)
+                return Response({"message": "Book rented successfully", "due_date": due_date.strftime('%Y-%m-%d'), "rental": serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "Book out of stock"}, status=status.HTTP_400_BAD_REQUEST)
-        except Book.DoesNotExist:
-            return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-class ReportLostBookView(APIView):
-    def post(self, request, rental_id, *args, **kwargs):
-        try:
-            rental = Rental.objects.get(id=rental_id)
-            rental.lost = True
-            rental.calculate_fine()
-            rental.save()
-            return Response({"message": "Book reported as lost", "fine_amount": rental.fine_amount}, status=status.HTTP_200_OK)
-        except Rental.DoesNotExist:
-            return Response({"error": "Rental not found"}, status=status.HTTP_404_NOT_FOUND)
+
+# @require_GET
+# def view_rentals(request):
+#      rentals = Rental.objects.all()
+#      data = list(rentals.values('id','book','rental_date','due_date','book_name','author_name'))
+#      return JsonResponse(data,safe=False)
 
 class RentalHistoryView(APIView):
     def get(self, request, *args, **kwargs):
         rentals = Rental.objects.filter(user=request.user)
         serializer = RentalSerializer(rentals, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ReportLostBookView(APIView):
+    def post(self, request, rental_id, *args, **kwargs):
+        try:
+            rental = Rental.objects.get(id=rental_id, user=request.user)
+            rental.lost = True
+            rental.calculate_fine()
+            rental.save()
+            return Response({"message": "Book reported as lost", "fine_amount": rental.fine_amount}, status=status.HTTP_200_OK)
+        except Rental.DoesNotExist:
+            return Response({"error": "Rental not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+@api_view(['GET'])
+@require_GET
+@permission_classes([IsAuthenticated])
+def rental_history(request):
+    user = request.user
+    print(user)
+    rentals = Rental.objects.filter(user=user)
+    data = [
+        {
+            'id': rental.id,
+            'book_name': rental.book.name,
+            'author': rental.book.author,
+            'rental_date': rental.rental_date,
+            'due_date': rental.due_date,
+            'returned': rental.returned,
+            'lost': rental.lost
+        } for rental in rentals
+    ]
+    return JsonResponse(data,safe=False)
+
+@api_view(['POST'])
+def report_lost(request, id):
+    try:
+        rental = Rental.objects.get(id=id)
+        rental.lost = True
+        rental.calculate_fine()  
+        rental.save()
+        return Response({'fine_amount': rental.fine_amount}, status=status.HTTP_200_OK)
+    except Rental.DoesNotExist:
+        return Response({'error': 'Rental not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+
+@api_view(['POST'])
+def create_purchase(request):
+    
+        user = request.data.get('user')
+        book = request.data.get('book')
+        purchase_date = request.data.get('purchase_date')
+        quantity = request.data.get('quantity')
+        total_price = request.data.get('total_price')
+
+        user = Customuser.objects.get(id=user) 
+        book = Book.objects.get(id=book)
+        book_name=book.name
+
+        purchase = Purchase.objects.create(
+            user=user,
+            book=book,
+            
+            purchase_date=purchase_date,
+            quantity=quantity,
+            total_price=total_price,
+            book_name=book_name
+        )
+
+        purchase.save()
+
+        send_mail(
+            'Purchase Confirmation',
+            f'Thank you for your purchase, {user.username}! You bought {purchase.quantity} copies of {book.name}.',
+            'amruthabiju1227@gmail.com',
+            [user.email],
+            fail_silently=False,
+        )
+
+        return Response({'message': 'Purchase successfully completed'}, status=status.HTTP_201_CREATED)
+
+
+@require_GET
+def view_purchase(request):
+     purchase = Purchase.objects.all()
+     data = list(purchase.values('id','book','purchase_date','quantity','total_price','book_name'))
+     return JsonResponse(data,safe=False)
+
+@require_GET
+def user_rentals(request):
+    rentals = Rental.objects.select_related('user', 'book').all()
+    rental_data = [{
+        'username': rental.user.username,
+        'email': rental.user.email,
+        'book_name': rental.book.name,
+        'author_name': rental.book.author,
+        'rental_date': rental.rental_date,
+        'due_date': rental.due_date,
+        'returned': rental.returned,
+        'lost': rental.lost,
+        'number_of_days': (rental.due_date - rental.rental_date).days,
+    } for rental in rentals]
+    return JsonResponse({'rentals': rental_data})
+
+@require_GET
+def view_purchase_history(request):
+    filters = request.GET
+    purchases = Purchase.objects.select_related('user', 'book').all()
+    
+
+    if 'username' in filters:
+        purchases = purchases.filter(user__username=filters['username'])
+    if 'email' in filters:
+        purchases = purchases.filter(user__email=filters['email'])
+    if 'book_name' in filters:
+        purchases = purchases.filter(book__name=filters['book_name'])
+    if 'author' in filters:
+        purchases = purchases.filter(book__author=filters['author'])
+
+    purchase_data = [
+        {
+            'id': purchase.id,
+            'username': purchase.user.username,
+            'email': purchase.user.email,
+            'book_name': purchase.book.name,
+            'author': purchase.book.author,
+            'purchase_date': purchase.purchase_date,
+            'quantity': purchase.quantity,
+            'total_price': purchase.total_price,
+        }
+        for purchase in purchases
+    ]
+    return JsonResponse(purchase_data, safe=False)
+    
+
+            
