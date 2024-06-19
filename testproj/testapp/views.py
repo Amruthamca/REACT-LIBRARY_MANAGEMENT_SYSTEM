@@ -349,29 +349,40 @@ def approve_user(request):
 #         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
 class RentBookView(APIView):
     def post(self, request, book_id, *args, **kwargs):
+        try:
             book = Book.objects.get(id=book_id)
             rental_period = request.data.get('rentalPeriod', 1)
             user = request.user
-            print(user)
-            user = Customuser.objects.get(id=user)  
-
-
+            
             if book.stock > 0:
                 book.stock -= 1
                 book.save()
-                due_date = datetime.now() + timedelta(days=int(rental_period))
+                
+                due_date = date.today() + timedelta(days=int(rental_period))
+                
                 rental = Rental.objects.create(
                     user=user,
                     book=book,
                     due_date=due_date,
-                    # book_name=book_name
                 )
+                
                 serializer = RentalSerializer(rental)
-                return Response({"message": "Book rented successfully", "due_date": due_date.strftime('%Y-%m-%d'), "rental": serializer.data}, status=status.HTTP_200_OK)
+                
+                return Response({
+                    "message": "Book rented successfully",
+                    "due_date": due_date, 
+                    "rental": serializer.data
+                }, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "Book out of stock"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Book.DoesNotExist:
+            return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # @require_GET
 # def view_rentals(request):
@@ -426,6 +437,28 @@ def report_lost(request, id):
         return Response({'fine_amount': rental.fine_amount}, status=status.HTTP_200_OK)
     except Rental.DoesNotExist:
         return Response({'error': 'Rental not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['POST'])
+def return_book(request, rental_id):
+    try:
+        rental = Rental.objects.get(id=rental_id)
+
+        if rental.returned:
+            return Response({'message': 'This book has already been returned.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        
+        rental.returned = True
+        rental.save()
+
+        book = rental.book
+        book.stock += 1
+        book.save()
+
+        return Response({'message': 'Book returned successfully!'}, status=status.HTTP_200_OK)
+    except Rental.DoesNotExist:
+        return Response({'error': 'Rental record not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
 
@@ -438,7 +471,7 @@ def create_purchase(request):
         quantity = request.data.get('quantity')
         total_price = request.data.get('total_price')
 
-        user = Customuser.objects.get(id=user) 
+        user = request.user
         book = Book.objects.get(id=book)
         book_name=book.name
 

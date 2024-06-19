@@ -28,7 +28,7 @@ urlpatterns = [
     path('pending-users/', views.pending_users, name='pending_users'),
     path('approve-user/', views.approve_user, name='approve_user'),
 
-    path('purchases/', views.create_purchase, name='create_purchase'),
+    path('purchases', views.create_purchase, name='create_purchase'),
     path('view_purchase/',views.view_purchase,name='view_purchase'),
     
     
@@ -39,6 +39,7 @@ urlpatterns = [
 
     path('rental_history', views.rental_history, name='rental_history'),
     path('report-lost/<int:id>', views.report_lost, name='report_lost'),
+    path('return-book/<int:rental_id>', views.return_book, name='return-book'),
 
     path('user_rentals/', views.user_rentals, name='user_rentals'),
     path('view_purchase_history/', views.view_purchase_history, name='view_purchase_history'),
