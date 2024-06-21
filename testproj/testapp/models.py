@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from datetime import datetime,date
 
 
+
 class Customuser(AbstractUser):
     user_type=models.IntegerField(default=0)
     is_approved = models.BooleanField(default=False)
@@ -13,6 +14,8 @@ class Book(models.Model):
     publisher_id = models.CharField(max_length=255)
     stock = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
+
+
 
 
 class Rental(models.Model):
@@ -26,11 +29,15 @@ class Rental(models.Model):
 
     def calculate_fine(self):
         if not self.returned:
-            today=date.today()
+            today = date.today()
             overdue_days = (today - self.due_date).days
-            if overdue_days > 0:
-                self.fine_amount = self.book.price + (overdue_days * 1)  
-                self.save()
+            if self.lost:
+                self.fine_amount = self.book.price + 50  
+            elif overdue_days > 0:
+                self.fine_amount = overdue_days * 1  
+            self.save()
+
+            
 
 class Purchase(models.Model):
     user = models.ForeignKey(Customuser, on_delete=models.CASCADE)
@@ -39,6 +46,8 @@ class Purchase(models.Model):
     quantity = models.IntegerField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     book_name=models.CharField(max_length=200,null=True)
+
+
 
     
 

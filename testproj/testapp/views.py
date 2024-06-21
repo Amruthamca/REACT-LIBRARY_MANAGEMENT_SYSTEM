@@ -26,6 +26,9 @@ from django.utils import timezone
 from datetime import datetime, timedelta,date
 from django.utils.timezone import now
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q, Count
+from django.contrib.auth.decorators import login_required
+
 @api_view(['POST'])
 def add_book(request):
     name = request.data.get('name')
@@ -447,6 +450,9 @@ def return_book(request, rental_id):
             return Response({'message': 'This book has already been returned.'}, status=status.HTTP_400_BAD_REQUEST)
 
         
+        rental.calculate_fine()
+
+        
         rental.returned = True
         rental.save()
 
@@ -454,7 +460,14 @@ def return_book(request, rental_id):
         book.stock += 1
         book.save()
 
-        return Response({'message': 'Book returned successfully!'}, status=status.HTTP_200_OK)
+        if rental.fine_amount > 0:
+            return Response({
+                'message': 'Book returned successfully!',
+                'fine': f'You have a fine of ${rental.fine_amount:.2f} for returning the book late.'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({'message': 'Book returned successfully!'}, status=status.HTTP_200_OK)
+
     except Rental.DoesNotExist:
         return Response({'error': 'Rental record not found.'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
@@ -463,6 +476,8 @@ def return_book(request, rental_id):
 
 
 @api_view(['POST'])
+@require_POST
+@permission_classes([IsAuthenticated])
 def create_purchase(request):
     
         user = request.data.get('user')
@@ -475,6 +490,10 @@ def create_purchase(request):
         book = Book.objects.get(id=book)
         book_name=book.name
 
+        if book.stock > 0:
+                book.stock -= 1
+                book.save()
+
         purchase = Purchase.objects.create(
             user=user,
             book=book,
@@ -483,9 +502,11 @@ def create_purchase(request):
             quantity=quantity,
             total_price=total_price,
             book_name=book_name
+            
         )
 
         purchase.save()
+
 
         send_mail(
             'Purchase Confirmation',
@@ -498,9 +519,12 @@ def create_purchase(request):
         return Response({'message': 'Purchase successfully completed'}, status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET'])
 @require_GET
+@permission_classes([IsAuthenticated])
 def view_purchase(request):
-     purchase = Purchase.objects.all()
+     user = request.user
+     purchase = Purchase.objects.filter(user=user)
      data = list(purchase.values('id','book','purchase_date','quantity','total_price','book_name'))
      return JsonResponse(data,safe=False)
 
@@ -549,6 +573,105 @@ def view_purchase_history(request):
         for purchase in purchases
     ]
     return JsonResponse(purchase_data, safe=False)
-    
 
+
+class UserProfileAPIView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserSerializer
+
+    def get_object(self):
+        return self.request.user 
+
+
+
+@require_GET
+def view_users(request):
+    users = Customuser.objects.filter(user_type=1, is_approved=True)
+    data = list(users.values('id','username','email'))
+    return JsonResponse(data,safe=False)
+
+@require_GET
+def lib(request):
+    pending_user = Customuser.objects.filter(is_approved=False,user_type=1).count()
+    total_user = Customuser.objects.filter(user_type=1,is_approved=1).count()
+    total_books = Book.objects.count()
+    total_book_purchases = Purchase.objects.count()
+    total_book_rentals = Rental.objects.count()
+    total_lost_books = Rental.objects.filter(lost=True).count()
+    
+    data = {
+        'totalUsers': total_user,
+        'totalBooks': total_books,
+        'totalBookPurchases': total_book_purchases,
+        'totalBookRentals': total_book_rentals,
+        'totalLostBooks': total_lost_books,
+        'totalPendingApprovals': pending_user,
+    }
+    
+    return JsonResponse(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_stats(request):
+    user = request.user
+    total_purchases = Purchase.objects.filter(user=user).count()
+    total_rented_books = Rental.objects.filter(user=user, returned=False).count()
+    total_books_lost = Rental.objects.filter(user=user, lost=True).count()
+    total_books_returned = Rental.objects.filter(user=user, returned=True).count()
+
+    data = {
+        'username': user.username,
+        'totalPurchases': total_purchases,
+        'totalRentedBooks': total_rented_books,
+        'totalBooksLost': total_books_lost,
+        'totalBooksReturned': total_books_returned,
+    }
+
+    return JsonResponse(data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def due_soon_rentals(request):
+    user = request.user
+    today = timezone.now().date()
+    two_days_later = today + timedelta(days=2)
+
+    due_soon = Rental.objects.filter(
+        user=user,
+        due_date__lte=two_days_later,  
+        returned=False,
+        lost=False  
+    )
+
+    data = [{
+        'book_title': rental.book.name,
+        'due_date': rental.due_date
+    } for rental in due_soon]
+
+    return Response(data)
+
+@api_view(['GET'])
+def due_soon_rental(request):
+    today = timezone.now().date()
+    two_days_later = today + timedelta(days=1)
+
+    due_soon = Rental.objects.filter(
+        due_date__lte=two_days_later,
+        returned=False,
+        lost=False
+    )
+
+    rentals_data = [{
+        'username': rental.user.username,
+        'book_title': rental.book.name,
+        'due_date': rental.due_date
+    } for rental in due_soon]
+
+    count = due_soon.count()
+
+    response_data = {
+        'rentals': rentals_data,
+        'count': count
+    }
+
+    return Response(response_data)
             

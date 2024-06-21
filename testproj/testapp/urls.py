@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import LoginView,UserViewSet,RentalViewSet
 from .import views
-from .views import RentBookView, ReportLostBookView, RentalHistoryView
+from .views import RentBookView, ReportLostBookView, RentalHistoryView,UserProfileAPIView
 
 router = DefaultRouter()
 router.register(r'users',UserViewSet)
@@ -43,6 +43,18 @@ urlpatterns = [
 
     path('user_rentals/', views.user_rentals, name='user_rentals'),
     path('view_purchase_history/', views.view_purchase_history, name='view_purchase_history'),
+
+    path('profile/', UserProfileAPIView.as_view(), name='user-profile'),
+
+    # path('notifications/', views.notifications, name='notifications'),
+
+    path('view_users/',views.view_users,name='view_users'),
+
+    path('lib/',views.lib,name='lib'),
+    path('user_stats',views.user_stats,name='user_stats'),
+
+    path('due_soon_rentals/',views.due_soon_rentals,name='due_soon_rentals'),
+    path('due_soon_rental/',views.due_soon_rental,name='due_soon_rental')
 
     
     
