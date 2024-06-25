@@ -7,6 +7,10 @@ from datetime import datetime,date
 class Customuser(AbstractUser):
     user_type=models.IntegerField(default=0)
     is_approved = models.BooleanField(default=False)
+    firstname = models.CharField(max_length=255, default='')
+    lastname = models.CharField(max_length=255, default='')
+    address = models.CharField(max_length=1024, default='')
+    mobileno = models.CharField(max_length=15, default='')
 
 class Book(models.Model):
     name = models.CharField(max_length=255)
@@ -14,7 +18,7 @@ class Book(models.Model):
     publisher_id = models.CharField(max_length=255)
     stock = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-
+    image = models.ImageField(upload_to='book_images/', null=True, blank=True)
 
 
 
@@ -26,6 +30,7 @@ class Rental(models.Model):
     returned = models.BooleanField(default=False)
     lost = models.BooleanField(default=False)
     fine_amount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    returned_date = models.DateField(null=True, blank=True) 
 
     def calculate_fine(self):
         if not self.returned:
@@ -34,7 +39,7 @@ class Rental(models.Model):
             if self.lost:
                 self.fine_amount = self.book.price + 50  
             elif overdue_days > 0:
-                self.fine_amount = overdue_days * 1  
+                self.fine_amount = self.book.price + overdue_days * 1   
             self.save()
 
             

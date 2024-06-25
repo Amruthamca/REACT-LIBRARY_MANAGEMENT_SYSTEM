@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customuser
-        fields = ('id', 'username', 'email', 'user_type')
+        fields = ('id', 'username', 'email', 'user_type','firstname','lastname','address','mobileno')
 
     
 

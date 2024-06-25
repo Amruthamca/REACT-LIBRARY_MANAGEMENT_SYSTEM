@@ -36,7 +36,9 @@ def add_book(request):
     publisher_id = request.data.get('publisher_id')
     stock = request.data.get('stock')
     price = request.data.get('price')
-    book = Book.objects.create(name=name, author=author, publisher_id=publisher_id, stock=stock, price=price)
+    image = request.FILES.get('image')
+    
+    book = Book.objects.create(name=name, author=author, publisher_id=publisher_id, stock=stock, price=price,image=image)
     book.save()
     return Response({'status': 'Book added successfully'}, status=201)
 
@@ -90,23 +92,58 @@ def approve_user(request, user_id):
     except Customuser.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
 
+# @api_view(['POST'])
+# def register_user(request):
+#     username = request.data.get('username')
+#     email = request.data.get('email')
+#     # password = request.data.get('password')
+#     user_type = request.data.get('user_type')
+#     # Create User object and save to database
+#     password = ''.join(random.choices(string.digits, k=6))
+#     user = Customuser.objects.create(username=username, email=email,user_type=user_type)
+#     user.set_password(password)
+#     user.save()
+    
+    
+#     subject='Regsitration Success'
+#     message='username:'+str(username)+"\n"+'password:'+str(password)+"\n"+'email:'+str(email)
+#     send_mail(subject,message,settings.EMAIL_HOST_USER,{user.email})
+#     messages.info(request,'Registration success, please check your email for username and password..')
+#     return Response({'message': 'User registered successfully'})
+
 @api_view(['POST'])
 def register_user(request):
     username = request.data.get('username')
     email = request.data.get('email')
-    # password = request.data.get('password')
+    firstname = request.data.get('firstname')
+    lastname = request.data.get('lastname')
+    address = request.data.get('address')
+    mobileno = request.data.get('mobileno')
     user_type = request.data.get('user_type')
-    # Create User object and save to database
+
+    errors = {}
+
+    if Customuser.objects.filter(username=username).exists():
+        errors['username'] = 'Username already exists'
+
+    if Customuser.objects.filter(email=email).exists():
+        errors['email'] = 'Email already exists'
+
+    if errors:
+        return Response(errors, status=400)
+
     password = ''.join(random.choices(string.digits, k=6))
-    user = Customuser.objects.create(username=username, email=email,user_type=user_type)
+    user = Customuser.objects.create(
+        username=username, email=email, user_type=user_type,
+        firstname=firstname, lastname=lastname, address=address, mobileno=mobileno
+    )
     user.set_password(password)
     user.save()
-    
-    
-    subject='Regsitration Success'
-    message='username:'+str(username)+"\n"+'password:'+str(password)+"\n"+'email:'+str(email)
-    send_mail(subject,message,settings.EMAIL_HOST_USER,{user.email})
-    messages.info(request,'Registration success, please check your email for username and password..')
+
+    subject = 'Registration Success'
+    message = f'Username: {username}\nPassword: {password}\nEmail: {email}'
+    send_mail(subject, message, settings.EMAIL_HOST_USER, [user.email])
+
     return Response({'message': 'User registered successfully'})
 
 @require_GET
@@ -202,30 +239,71 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return Response({'status': 'user disapproved'})
 
-
 class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            email = request.data.get('email')
-            password = request.data.get('password')
-            user = authenticate(username = email, password = password)
-            print('hai')
-            print(user)
+            email = serializer.validated_data.get('email')
+            password = serializer.validated_data.get('password')
+            user = authenticate(username=email, password=password)
+
             if user:
-                user_type=user.user_type
-                if user_type == 0:
-                    role = 'Admin'
-                else:
-                    role = 'User'
+                if user.is_active:
+                    if user.is_superuser:  
+                        role = 'Admin'
+                        refresh = RefreshToken.for_user(user)
+                        return JsonResponse({
+                            'access': str(refresh.access_token),
+                            'role': role,
+                            'user': user.id
+                        }, safe=False)
+                    elif user.is_approved:  
+                        role = 'User'
+                        refresh = RefreshToken.for_user(user)
+                        return JsonResponse({
+                            'access': str(refresh.access_token),
+                            'role': role,
+                            'user': user.id
+                        }, safe=False)
+                    else:  
+                        return JsonResponse({
+                            'message': 'Please wait for admin approval. You will receive a confirmation email upon approval.'
+                        }, status=status.HTTP_401_UNAUTHORIZED)
+                else:  
+                    return JsonResponse({
+                        'message': 'User account is disabled.'
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+            else:  
+                return JsonResponse({
+                    'message': 'Invalid credentials.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+        else:  
+            return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-                refresh = RefreshToken.for_user(user)
+# class LoginView(APIView):
+#     def post(self, request):
+#         serializer = LoginSerializer(data=request.data)
+#         if serializer.is_valid():
+#             email = request.data.get('email')
+#             password = request.data.get('password')
+#             user = authenticate(username = email, password = password)
+#             print('hai')
+#             print(user)
+#             if user:
+#                 user_type=user.user_type
+#                 if user_type == 0:
+#                     role = 'Admin'
+#                 else:
+#                     role = 'User'
+
+#                 refresh = RefreshToken.for_user(user)
                 
-                print(refresh.access_token)
-                return JsonResponse({'access':str(refresh.access_token),'role':role, 'user':user.id },safe=False)
-        else:
+#                 print(refresh.access_token)
+#                 return JsonResponse({'access':str(refresh.access_token),'role':role, 'user':user.id },safe=False)
+#         else:
 
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         
 class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
@@ -452,7 +530,7 @@ def return_book(request, rental_id):
         
         rental.calculate_fine()
 
-        
+        rental.returned_date = date.today() 
         rental.returned = True
         rental.save()
 
@@ -531,17 +609,23 @@ def view_purchase(request):
 @require_GET
 def user_rentals(request):
     rentals = Rental.objects.select_related('user', 'book').all()
-    rental_data = [{
-        'username': rental.user.username,
-        'email': rental.user.email,
-        'book_name': rental.book.name,
-        'author_name': rental.book.author,
-        'rental_date': rental.rental_date,
-        'due_date': rental.due_date,
-        'returned': rental.returned,
-        'lost': rental.lost,
-        'number_of_days': (rental.due_date - rental.rental_date).days,
-    } for rental in rentals]
+
+    rental_data = []
+    for rental in rentals:
+        rental_data.append({
+            'firstname': rental.user.firstname,
+            'email': rental.user.email,
+            'book_name': rental.book.name,
+            'author_name': rental.book.author,
+            'rental_date': rental.rental_date,
+            'due_date': rental.due_date,
+            'returned_date': rental.returned_date.strftime('%Y-%m-%d') if rental.returned_date else None,
+            'returned': rental.returned,
+            'lost': rental.lost,
+            'fine_amount': rental.fine_amount,
+            'number_of_days': (rental.due_date - rental.rental_date).days,
+        })
+
     return JsonResponse({'rentals': rental_data})
 
 @require_GET
@@ -550,8 +634,8 @@ def view_purchase_history(request):
     purchases = Purchase.objects.select_related('user', 'book').all()
     
 
-    if 'username' in filters:
-        purchases = purchases.filter(user__username=filters['username'])
+    if 'firstname' in filters:
+        purchases = purchases.filter(user__firstname=filters['firstname'])
     if 'email' in filters:
         purchases = purchases.filter(user__email=filters['email'])
     if 'book_name' in filters:
@@ -562,7 +646,7 @@ def view_purchase_history(request):
     purchase_data = [
         {
             'id': purchase.id,
-            'username': purchase.user.username,
+            'firstname': purchase.user.firstname,
             'email': purchase.user.email,
             'book_name': purchase.book.name,
             'author': purchase.book.author,
@@ -574,19 +658,36 @@ def view_purchase_history(request):
     ]
     return JsonResponse(purchase_data, safe=False)
 
-
 class UserProfileAPIView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
 
     def get_object(self):
-        return self.request.user 
+        return self.request.user
 
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        validated_data = serializer.validated_data
+        username = validated_data.get('username')
+        email = validated_data.get('email')
 
+        # Check if username already exists
+        if User.objects.filter(username=username).exclude(id=instance.id).exists():
+            return Response({'error': {'username': 'Username already exists.'}}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if email already exists
+        if User.objects.filter(email=email).exclude(id=instance.id).exists():
+            return Response({'error': {'email': 'Email already exists.'}}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Perform update if no errors
+        self.perform_update(serializer)
+        return Response(serializer.data)
 @require_GET
 def view_users(request):
     users = Customuser.objects.filter(user_type=1, is_approved=True)
-    data = list(users.values('id','username','email'))
+    data = list(users.values('id','firstname','lastname','address','mobileno','email'))
     return JsonResponse(data,safe=False)
 
 @require_GET
